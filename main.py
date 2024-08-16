@@ -1,44 +1,41 @@
-
-
 from flask import Flask, render_template, request
 import os
 import yfinance as yf
 import pandas as pd
 
 app = Flask(__name__)
+
 @app.route('/')
-def hello_world():
+def home():
     # URL of the Google Sheets document
     url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSUAVjQ4CoPwfIyVzdS6jp22XvnJs6m8W05hag1xUXKo5TrgjbYTIggJxP8TO6spPRCKi5l4sMyPXBr/pub?output=xlsx'
 
     # Fetch data from Google Sheets using Pandas
-    allCompanyData = pd.read_excel(url).values.tolist()
+    try:
+        allCompanyData = pd.read_excel(url).values.tolist()
+    except Exception as e:
+        print(f"An error occurred while fetching data from Google Sheets: {str(e)}")
+        allCompanyData = []
 
     # Render the template with fetched data
     return render_template('index.html', allCompanyData=allCompanyData)
 
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-
 @app.route('/stock_data', methods=['POST', 'GET'])
 def stockFun():
-
     UserTicker_data = request.form.get('searchOutput')
     ticker = UserTicker_data.upper()
 
     # COMPANY INFORMATION
     try:
-        # Get company information using yfinance
         companyInfo = yf.Ticker(ticker).info
         companyInfo = pd.DataFrame.from_dict(companyInfo, orient='index', columns=['Value']).reset_index()
         companyInfo.columns = ['Attribute', 'Value']
         companyName = companyInfo[companyInfo['Attribute'] == 'longName']['Value'].iloc[0]
         companyInfo = companyInfo.to_html(index=True)
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching company information: {str(e)}")
         companyInfo = e
+        companyName = "N/A"
 
     # STOCK HISTORY
     try:
@@ -46,19 +43,18 @@ def stockFun():
         stockHistory = stockHistory.reset_index()
         stockHistory = stockHistory.to_json(orient='records')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching stock history: {str(e)}")
         stockHistory = e
 
     # DIVIDEND
-    dividend = yf.Ticker(UserTicker_data).actions
-    dividend.drop(columns=['Stock Splits'], inplace=True, errors='ignore')
-
     try:
+        dividend = yf.Ticker(UserTicker_data).actions
+        dividend.drop(columns=['Stock Splits'], inplace=True, errors='ignore')
         dividend = dividend[dividend['Dividends'] > 0]
         dividend = dividend.reset_index()
         dividend = dividend.to_json(orient='records')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching dividend data: {str(e)}")
         dividend = e
 
     # NET INCOME
@@ -67,7 +63,7 @@ def stockFun():
         incomeStmtJson.columns = incomeStmtJson.columns.tolist()
         incomeStmtJson = incomeStmtJson.to_html(index=True)
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching income statement: {str(e)}")
         incomeStmtJson = e
 
     # MAJOR HOLDERS
@@ -76,7 +72,7 @@ def stockFun():
         majorHolders.columns = ['Percentage', 'Holders']
         majorHolders = majorHolders.to_html(index=False)
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching major holders: {str(e)}")
         majorHolders = e
 
     # INSTITUTIONAL HOLDERS
@@ -85,7 +81,7 @@ def stockFun():
         institutionalHolders.columns = institutionalHolders.columns.tolist()
         institutionalHolders = institutionalHolders.to_html(index=False)
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching institutional holders: {str(e)}")
         institutionalHolders = e
 
     # INSTITUTIONAL HOLDERS PIE CHART
@@ -94,7 +90,7 @@ def stockFun():
         institutionalHoldersPie.columns = ['Holders', 'Shares', 'Date Reported', '% Out', 'Value']
         institutionalHoldersPie = institutionalHoldersPie.to_dict(orient='records')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching institutional holders pie chart data: {str(e)}")
         institutionalHoldersPie = e
 
     # MUTUAL FUND HOLDERS PIE CHART
@@ -103,7 +99,7 @@ def stockFun():
         mutualFundHoldersPie.columns = ['Holders', 'Shares', 'Date Reported', '% Out', 'Value']
         mutualFundHoldersPie = mutualFundHoldersPie.to_dict(orient='records')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching mutual fund holders pie chart data: {str(e)}")
         mutualFundHoldersPie = e
 
     # NEWS
@@ -113,7 +109,7 @@ def stockFun():
         newsData['link'] = newsData['link'].apply(lambda x: f'<a href="{x}" target="_blank">{x}</a>')
         newsData = newsData.to_html(index=False, columns=['title', 'relatedTickers', 'link'], escape=False, header=True)
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching news data: {str(e)}")
         newsData = e
 
     # CANDLE CHART AND VOLUME
@@ -122,7 +118,7 @@ def stockFun():
         candleChart.reset_index(inplace=True)
         candleChart = candleChart.to_json(orient='records', date_format='iso')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching candle chart data: {str(e)}")
         candleChart = e
 
     try:
@@ -130,7 +126,7 @@ def stockFun():
         VolumeData.reset_index(inplace=True)
         VolumeData = VolumeData.to_json(orient='records', date_format='iso')
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        print(f"An error occurred while fetching volume data: {str(e)}")
         VolumeData = e
 
     # Render the template with fetched data
